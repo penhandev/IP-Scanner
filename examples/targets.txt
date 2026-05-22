@@ -1,0 +1,20 @@
+# Sample targets — supports IPs, CIDR, ranges, domains, URLs.
+# Lines starting with '#' are ignored.
+
+# --- Single IPs ---
+8.8.8.8
+1.1.1.1
+
+# --- CIDR (small for demo; /24 = 254 hosts) ---
+192.168.1.0/30
+
+# --- IPv4 range ---
+10.0.0.1-10.0.0.5
+
+# --- Domains ---
+github.com
+www.cloudflare.com
+
+# --- URLs ---
+https://api.github.com
+http://example.com/some/path

@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- PyInstaller build artifacts ---
+build/
+dist/
+*.exe
+
+# --- Scanner output ---
+results_*.txt
+results_*.json
+results_*.csv
+*.log
+
+# --- Editors / IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Claude Code ---
+.claude/
