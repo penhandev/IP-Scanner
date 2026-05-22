@@ -39,7 +39,13 @@ from rich.progress import (
 )
 
 from ipscanner import __version__, checker, exporter, parser
-from ipscanner.checker import IS_ANDROID, IS_ROOT, has_su, relaunch_as_root
+from ipscanner.checker import (
+    IS_ANDROID,
+    IS_ROOT,
+    has_su,
+    relaunch_as_root,
+    unprivileged_icmp_supported,
+)
 from ipscanner.ui import (
     clear_screen,
     confirm,
@@ -72,7 +78,13 @@ def _handle_android_icmp() -> bool:
     if IS_ROOT:
         return True
 
-    console.print("\n[bold yellow]⚠  Android detected — ICMP needs root[/bold yellow]")
+    # Most modern Android kernels allow unprivileged ICMP via SOCK_DGRAM
+    # (ping_group_range is usually 0..MAX). Try that first — no root needed.
+    if unprivileged_icmp_supported():
+        console.print("[green]✓ Unprivileged ICMP available — no root required.[/green]")
+        return True
+
+    console.print("\n[bold yellow]⚠  Android detected — kernel blocks unprivileged ICMP on this device[/bold yellow]")
     console.print("[cyan]Checking for root access (su)...[/cyan]")
     root_available = has_su()
 
@@ -277,11 +289,11 @@ def run_scan_from_input(
 # ---------------------------------------------------------------------------
 
 def interactive_mode() -> None:
-    if IS_ANDROID and not IS_ROOT:
+    if IS_ANDROID and not IS_ROOT and not unprivileged_icmp_supported():
         show_banner(__version__)
         console.print(
             "\n[bold yellow]⚠  Running on Android / Termux[/bold yellow]\n"
-            "   ICMP ping is [red]not available[/red] without root.\n"
+            "   This kernel blocks unprivileged ICMP, and you are not root.\n"
             "   Please select [bold]TCP[/bold] or [bold]HTTPS[/bold] as your check method.\n"
             "   (If your device is rooted, pick ICMP — scanner will request su.)\n"
         )
@@ -336,7 +348,12 @@ def interactive_mode() -> None:
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
-    default_method = "tcp" if (IS_ANDROID and not IS_ROOT) else "icmp"
+    # On non-rooted Android, only fall back to TCP when even unprivileged
+    # ICMP is unavailable. Most modern devices allow it.
+    if IS_ANDROID and not IS_ROOT and not unprivileged_icmp_supported():
+        default_method = "tcp"
+    else:
+        default_method = "icmp"
 
     ap = argparse.ArgumentParser(
         prog="scanner",
