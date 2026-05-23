@@ -56,13 +56,30 @@ def show_file_menu(files: list[str]) -> str | None:
 def show_method_menu() -> str:
     table = Table(show_header=False, box=None, padding=(0, 1))
     table.add_row("[cyan]1[/cyan]", "ICMP ping  [dim](classic, fast)[/dim]")
-    table.add_row("[cyan]2[/cyan]", "TCP :443   [dim](works when ICMP is blocked)[/dim]")
+    table.add_row("[cyan]2[/cyan]", "TCP        [dim](choose a port; works when ICMP is blocked)[/dim]")
     table.add_row("[cyan]3[/cyan]", "HTTPS HEAD [dim](best for CDN-fronted hosts)[/dim]")
     console.print("\n[bold]Check method:[/bold]")
     console.print(table)
 
     choice = Prompt.ask("Choose method", default="1").strip()
     return {"1": "icmp", "2": "tcp", "3": "http"}.get(choice, "icmp")
+
+
+def prompt_tcp_port(default: int = 443) -> int:
+    """Ask the user which TCP port to probe. 443 = HTTPS, 80 = HTTP."""
+    while True:
+        raw = Prompt.ask(
+            "TCP port [dim](443=HTTPS, 80=HTTP)[/dim]",
+            default=str(default),
+        ).strip()
+        try:
+            port = int(raw)
+        except ValueError:
+            console.print("[red]Port must be a number.[/red]")
+            continue
+        if 1 <= port <= 65535:
+            return port
+        console.print("[red]Port must be between 1 and 65535.[/red]")
 
 
 def confirm(prompt: str, default: str = "y") -> bool:

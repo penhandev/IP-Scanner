@@ -51,6 +51,7 @@ from ipscanner.ui import (
     confirm,
     console,
     pause,
+    prompt_tcp_port,
     show_banner,
     show_file_menu,
     show_method_menu,
@@ -157,6 +158,7 @@ def _execute_scan(
     resolve_dns: bool,
     output_label: str,
     formats: tuple[str, ...],
+    port: int = 443,
 ) -> None:
     """Run the scan on an already-built target list."""
     if IS_ANDROID and method == "icmp":
@@ -178,8 +180,11 @@ def _execute_scan(
         msg += f" [yellow]({unresolved:,} unresolved)[/yellow]"
     console.print(msg)
 
-    if not confirm(f"Start scan of {total:,} targets with method=[bold]{method}[/bold]?"):
+    method_label = f"tcp:{port}" if method == "tcp" else method
+    if not confirm(f"Start scan of {total:,} targets with method=[bold]{method_label}[/bold]?"):
         return
+
+    check_kwargs = {"port": port} if method == "tcp" else {}
 
     results: list[checker.CheckResult] = []
 
@@ -194,7 +199,10 @@ def _execute_scan(
         task = progress.add_task("Scanning", total=total)
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(checker.check, t, method=method): t for t in targets}
+            futures = {
+                pool.submit(checker.check, t, method=method, **check_kwargs): t
+                for t in targets
+            }
             for fut in as_completed(futures):
                 try:
                     res = fut.result()
@@ -235,6 +243,7 @@ def run_scan_from_file(
     workers: int = 100,
     formats: tuple[str, ...] = ("txt",),
     resolve_dns: bool = True,
+    port: int = 443,
 ) -> None:
     console.print(f"\n[cyan]Loading targets from[/cyan] {source_file}...")
     try:
@@ -245,7 +254,7 @@ def run_scan_from_file(
     except OSError as e:
         console.print(f"[red]Could not read file: {e}[/red]")
         return
-    _execute_scan(targets, method, workers, resolve_dns, source_file, formats)
+    _execute_scan(targets, method, workers, resolve_dns, source_file, formats, port=port)
 
 
 def run_scan_from_args(
@@ -254,6 +263,7 @@ def run_scan_from_args(
     workers: int = 100,
     formats: tuple[str, ...] = ("txt",),
     resolve_dns: bool = True,
+    port: int = 443,
 ) -> None:
     """Parse targets passed directly as CLI arguments (-t / --target)."""
     targets: list[parser.Target] = []
@@ -270,7 +280,7 @@ def run_scan_from_args(
         return
 
     console.print(f"\n[cyan]Parsed[/cyan] {len(targets):,} target(s) from arguments.")
-    _execute_scan(targets, method, workers, resolve_dns, "inline_targets", formats)
+    _execute_scan(targets, method, workers, resolve_dns, "inline_targets", formats, port=port)
 
 
 def run_scan_from_input(
@@ -278,6 +288,7 @@ def run_scan_from_input(
     workers: int = 100,
     formats: tuple[str, ...] = ("txt",),
     resolve_dns: bool = True,
+    port: int = 443,
 ) -> None:
     """Collect targets interactively (--input mode)."""
     targets = collect_targets_interactively()
@@ -285,7 +296,7 @@ def run_scan_from_input(
         console.print("[red]No targets entered.[/red]")
         return
     console.print(f"\n[cyan]Parsed[/cyan] {len(targets):,} target(s).")
-    _execute_scan(targets, method, workers, resolve_dns, "inline_targets", formats)
+    _execute_scan(targets, method, workers, resolve_dns, "inline_targets", formats, port=port)
 
 
 # ---------------------------------------------------------------------------
@@ -335,12 +346,14 @@ def interactive_mode() -> None:
                 continue
 
             method = show_method_menu()
-            run_scan_from_file(chosen, method=method)
+            port = prompt_tcp_port() if method == "tcp" else 443
+            run_scan_from_file(chosen, method=method, port=port)
             pause()
 
         elif choice == "2":
             method = show_method_menu()
-            run_scan_from_input(method=method)
+            port = prompt_tcp_port() if method == "tcp" else 443
+            run_scan_from_input(method=method, port=port)
             pause()
 
         else:
@@ -404,6 +417,11 @@ Android/Termux:
         help=f"Check method (default on this device: {default_method}).",
     )
     ap.add_argument(
+        "-p", "--port",
+        type=int, default=443,
+        help="TCP port for -m tcp (default: 443). Common: 80, 443, 8080.",
+    )
+    ap.add_argument(
         "-w", "--workers",
         type=int, default=100,
         help="Concurrent workers (default: 100).",
@@ -421,6 +439,9 @@ Android/Termux:
 
     args = ap.parse_args(argv)
 
+    if not (1 <= args.port <= 65535):
+        ap.error("--port must be between 1 and 65535")
+
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
@@ -436,6 +457,7 @@ Android/Termux:
                 workers=args.workers,
                 formats=tuple(args.output),
                 resolve_dns=not args.no_resolve,
+                port=args.port,
             )
         elif args.target:
             run_scan_from_args(
@@ -444,6 +466,7 @@ Android/Termux:
                 workers=args.workers,
                 formats=tuple(args.output),
                 resolve_dns=not args.no_resolve,
+                port=args.port,
             )
         elif args.input:
             run_scan_from_input(
@@ -451,6 +474,7 @@ Android/Termux:
                 workers=args.workers,
                 formats=tuple(args.output),
                 resolve_dns=not args.no_resolve,
+                port=args.port,
             )
         else:
             interactive_mode()
