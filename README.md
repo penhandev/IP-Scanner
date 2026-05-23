@@ -98,7 +98,7 @@ IP-Scanner/
 │   ├── checker.py          # ICMP / TCP / HTTP probes
 │   ├── exporter.py         # TXT / JSON / CSV writers
 │   └── ui.py               # Rich helpers
-├── examples/targets.txt    # sample input
+├── targets.txt             # sample input (also: akami.txt, amazon.txt, cloudflare.txt, fastly.txt)
 ├── .github/workflows/      # automated build & release pipeline
 ├── requirements.txt
 ├── .gitignore

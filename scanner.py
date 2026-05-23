@@ -63,6 +63,9 @@ log = logging.getLogger("ipscanner")
 # Helpers
 # ---------------------------------------------------------------------------
 
+_EXCLUDED_TXT = {"requirements.txt"}
+
+
 def list_txt_files() -> list[str]:
     return sorted(
         f.name
@@ -70,6 +73,7 @@ def list_txt_files() -> list[str]:
         if f.is_file()
         and f.suffix == ".txt"
         and not f.name.startswith("results_")
+        and f.name.lower() not in _EXCLUDED_TXT
     )
 
 
@@ -90,7 +94,7 @@ def _handle_android_icmp() -> bool:
 
     if root_available:
         console.print("[green]✓ Root (su) is available on this device.[/green]")
-        if confirm("Re-launch scanner with root to enable ICMP?"):
+        if confirm("Re-launch scanner with root to enable ICMP?", default="n"):
             console.print("[cyan]Re-launching as root... (superuser prompt may appear)[/cyan]\n")
             relaunch_as_root()  # never returns
         else:

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 import platform
-import select
 import socket
 import struct
 import subprocess
@@ -140,23 +139,39 @@ def _icmp_socket_ping(host: str, timeout_ms: int):
         except OSError as e:
             return (False, None, f"send: {e}")
 
-        # select() is more portable than settimeout() for one-shot ICMP
-        ready, _, _ = select.select([sock], [], [], timeout_ms / 1000)
-        if not ready:
-            return (False, None, "timeout")
+        # Read until we either find an Echo Reply for us or time out.
+        # Some kernels deliver the ICMP message without the IP header
+        # (the Linux SOCK_DGRAM/ICMP norm), others include it — handle both.
+        deadline = start + (timeout_ms / 1000)
+        while True:
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                return (False, None, "timeout")
+            sock.settimeout(remaining)
+            try:
+                data, _ = sock.recvfrom(1024)
+            except socket.timeout:
+                return (False, None, "timeout")
+            except OSError as e:
+                return (False, None, f"recv: {e}")
 
-        try:
-            data, _ = sock.recvfrom(1024)
-        except OSError as e:
-            return (False, None, f"recv: {e}")
+            icmp = data
+            # Strip an IPv4 header if the kernel prepended one.
+            if len(icmp) >= 20 and (icmp[0] >> 4) == 4:
+                ihl = (icmp[0] & 0x0F) * 4
+                if 20 <= ihl <= len(icmp):
+                    icmp = icmp[ihl:]
 
-        latency = (time.perf_counter() - start) * 1000
+            if len(icmp) < 4:
+                continue  # too short to be a valid ICMP message; keep listening
 
-        # SOCK_DGRAM/ICMP delivers only the ICMP message (no IP header).
-        # Validate type=0 (Echo Reply) — kernel filters by ident for us.
-        if len(data) >= 1 and data[0] == 0:
-            return (True, latency, None)
-        return (False, None, "no reply")
+            icmp_type = icmp[0]
+            if icmp_type == 0:  # Echo Reply
+                latency = (time.perf_counter() - start) * 1000
+                return (True, latency, None)
+            if icmp_type in (3, 11):  # Dest unreachable / TTL exceeded
+                return (False, None, f"icmp type {icmp_type}")
+            # Unexpected type — ignore and keep listening within the timeout
     finally:
         sock.close()
 

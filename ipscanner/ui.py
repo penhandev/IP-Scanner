@@ -65,8 +65,8 @@ def show_method_menu() -> str:
     return {"1": "icmp", "2": "tcp", "3": "http"}.get(choice, "icmp")
 
 
-def confirm(prompt: str) -> bool:
-    return Prompt.ask(prompt, choices=["y", "n"], default="n").lower() == "y"
+def confirm(prompt: str, default: str = "y") -> bool:
+    return Prompt.ask(prompt, choices=["y", "n"], default=default).lower() == "y"
 
 
 def pause() -> None:

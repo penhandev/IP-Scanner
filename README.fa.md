@@ -103,7 +103,7 @@ IP-Scanner/
 │   ├── checker.py          # بررسی ICMP / TCP / HTTP
 │   ├── exporter.py         # خروجی TXT / JSON / CSV
 │   └── ui.py               # helpers برای Rich
-├── examples/targets.txt    # ورودی نمونه
+├── targets.txt             # ورودی نمونه (همچنین: akami.txt, amazon.txt, cloudflare.txt, fastly.txt)
 ├── .github/workflows/      # خودکارسازی build و release
 ├── requirements.txt
 ├── .gitignore
